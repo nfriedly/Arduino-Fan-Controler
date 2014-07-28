@@ -19,6 +19,8 @@ Potential future goals include:
 * Window & door open/closed status detection - don't turn on the fan if the house is shut
 * Automatic window opening
 
+The part choices might be a little odd, but they're primarily based on what I already had lying around and/or could source for free. You've got 6 analog lines available, so one could easily switch to analog sensors. And a regular (cheaper) mechanical relay would work fine as long as it (and it's PCB!) can handle the current of the fan.
+
 MIT License
 -----------
 
@@ -46,4 +48,4 @@ THE SOFTWARE.
 [Arduino]: http://arduino.cc/
 [RGB LCD]: http://www.adafruit.com/product/398
 [DS18B20]: http://www.maximintegrated.com/en/products/analog/sensors-and-sensor-interface/DS18B20.html
-[Solid State Relay]: http://pewa.panasonic.com/components/relays/solid-state-relays/high-capacity-ssr/aq-a/specifications/
+[Solid State Relay]: http://pewa.panasonic.com/components/relays/solid-state-relays/high-capacity-ssr/aq-a/
