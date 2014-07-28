@@ -1,8 +1,23 @@
 Arduino Fan Controller
 ======================
 
-Custom controller for a whole house fan. Designed for use with a [Digispark] + [Relay], [Temperature], and [LCD] shields.
+Custom controller for a whole house fan. Designed for use with an [Arduino], an 16x2 [RGB LCD], four [DS18B20] temperature sensors, and a [Solid State Relay].
 
+Currently a work in progress.
+
+Primary goals are:
+
+* Automatic temperature control based on internal/external sensors
+* Temperature selection + on/off/standby mode via a potentiometer
+* Reporting of outdoor temp and multiple indoor temperatures
+* Backlight color to indicate difference between outdoor and indoor temperature (mainly for standby mode)
+* Automatic brightness dimming at night
+
+Potential future goals include:
+
+* Ethernet connection and REST API
+* Window & door open/closed status detection - don't turn on the fan if the house is shut
+* Automatic window opening
 
 MIT License
 -----------
@@ -28,7 +43,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 
-[Digispark]: http://digistump.com/products/1
-[Relay]: http://digistump.com/products/6
-[Temperature]: http://digistump.com/products/97
-[LCD]: http://digistump.com/products/16
+[Arduino]: http://arduino.cc/
+[RGB LCD]: http://www.adafruit.com/product/398
+[DS18B20]: http://www.maximintegrated.com/en/products/analog/sensors-and-sensor-interface/DS18B20.html
+[Solid State Relay]: http://pewa.panasonic.com/components/relays/solid-state-relays/high-capacity-ssr/aq-a/specifications/

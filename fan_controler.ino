@@ -1,64 +1,152 @@
-/* ATtiny85 as an I2C Master   Ex2        BroHogan                           1/21/11
- * Modified for Digistump - Digispark LCD Shield by Erik Kettenburg 11/2012
- * SETUP:
- * ATtiny Pin 1 = (RESET) N/U                      ATtiny Pin 2 = (D3) N/U
- * ATtiny Pin 3 = (D4) to LED1                     ATtiny Pin 4 = GND
- * ATtiny Pin 5 = SDA on DS1621  & GPIO            ATtiny Pin 6 = (D1) to LED2
- * ATtiny Pin 7 = SCK on DS1621  & GPIO            ATtiny Pin 8 = VCC (2.7-5.5V)
- * NOTE! - It's very important to use pullups on the SDA & SCL lines!
- * PCA8574A GPIO was used wired per instructions in "info" folder in the LiquidCrystal_I2C lib.
- * This ex assumes A0-A2 are set HIGH for an addeess of 0x3F
- * LiquidCrystal_I2C lib was modified for ATtiny - on Playground with TinyWireM lib.
- * TinyWireM USAGE & CREDITS: - see TinyWireM.h
- */
+#include <OneWire.h>
+#include <LiquidCrystal.h>
+#include <Wire.h>
 
-//#define DEBUG
-#include <TinyWireM.h>                  // I2C Master lib for ATTinys which use USI - comment this out to use with standard arduinos
-#include <LiquidCrystal_I2C.h>          // for LCD w/ GPIO MODIFIED for the ATtiny85
+// OneWire DS18S20, DS18B20, DS1822 Temperature Example
+//
+// http://www.pjrc.com/teensy/td_libs_OneWire.html
+//
+// The DallasTemperature library can do all this work for you!
+// http://milesburton.com/Dallas_Temperature_Control_Library
 
-#define GPIO_ADDR     0x27             // (PCA8574A A0-A2 @5V) typ. A0-A3 Gnd 0x20 / 0x38 for A - 0x27 is the address of the Digispark LCD modules.
+OneWire  ds(4);  // on pin 10 (a 4.7K resistor is necessary)
 
+// lcd setup - https://learn.adafruit.com/character-lcds/rgb-backlit-lcds
 
-LiquidCrystal_I2C lcd(GPIO_ADDR,16,2);  // set address & 16 chars / 2 lines
+#define REDLITE 3
+#define GREENLITE 5
+#define BLUELITE 6
+// initialize the library with the numbers of the interface pins
+LiquidCrystal lcd(7, 8, 9, 10, 11, 12);
+// you can change the overall brightness by range 0 -> 255
+int brightness = 255;
 
+void setup(void) {
+   // set up the LCD's number of rows and columns:
+  lcd.begin(16, 2);
 
-void setup(){
-  TinyWireM.begin();                    // initialize I2C lib - comment this out to use with standard arduinos
-  lcd.init();                           // initialize the lcd (defaults to pins 0 & 2)
-  lcd.backlight();                      // light up the LCD
-  //lcd.setCursor(5, 1); // fifth character second column
-  //lcd.print((char)223); // degree symbol
-  //lcd.print("F");
-  pinMode(4, INPUT); // Digital 4 is analog (ADC channel) 2
-  pinMode(5, OUTPUT);
-  lcd.print("Cutoff Temp ");
+  pinMode(REDLITE, OUTPUT);
+  pinMode(GREENLITE, OUTPUT);
+  pinMode(BLUELITE, OUTPUT);
+   
+  //brightness = 100;
 }
 
-int sensorValue = 0;
+void loop(void) {
+  byte i;
+  byte present = 0;
+  byte type_s;
+  byte data[12];
+  byte addr[8];
+  float celsius, fahrenheit;
+  
+ for (int i = 0; i < 255; i++) {
+  setBacklight(i, 0, 255-i);
+  delay(5);
+  }
+  for (int i = 0; i < 255; i++) {
+  setBacklight(255-i, i, 0);
+  delay(5);
+  }
+  for (int i = 0; i < 255; i++) {
+  setBacklight(0, 255-i, i);
+  delay(5);
+  }
+  
+  lcd.clear();
+  
+  if ( !ds.search(addr)) {
+    lcd.print("No more addresses.");
+    ds.reset_search();
+    delay(250);
+    return;
+  }
+  
+  for( i = 0; i < 8; i++) {
+    lcd.print(addr[i], HEX);
+  }
+  
+  // next line
+  lcd.setCursor(0,1);
 
-void loop(){
-  lcd.setCursor(12, 0);
-  sensorValue = analogRead(2); // Digital 4 is analog 2
-  lcd.print(doubleMap(sensorValue, 0, 1023, 60, 80.1)); // it stops at 79.9 when I set the max to 80
-  delay(250);
+  if (OneWire::crc8(addr, 7) != addr[7]) {
+      lcd.print("CRC is not valid!");
+      return;
+  }
+ 
+  // the first ROM byte indicates which chip
+  switch (addr[0]) {
+    case 0x10:
+      //lcd.print("  Chip = DS18S20");  // or old DS1820
+      type_s = 1;
+      break;
+    case 0x28:
+      //lcd.print("  Chip = DS18B20");
+      type_s = 0;
+      break;
+    case 0x22:
+      //lcd.print("  Chip = DS1822");
+      type_s = 0;
+      break;
+    default:
+      //lcd.print("Device is not a DS18x20 family device.");
+      return;
+  } 
+
+  ds.reset();
+  ds.select(addr);
+  ds.write(0x44, 1);        // start conversion, with parasite power on at the end
+  
+  delay(1000);     // maybe 750ms is enough, maybe not
+  // we might do a ds.depower() here, but the reset will take care of it.
+  
+  present = ds.reset();
+  ds.select(addr);    
+  ds.write(0xBE);         // Read Scratchpad
+
+  for ( i = 0; i < 9; i++) {           // we need 9 bytes
+    data[i] = ds.read();
+  }
+
+  // Convert the data to actual temperature
+  // because the result is a 16 bit signed integer, it should
+  // be stored to an "int16_t" type, which is always 16 bits
+  // even when compiled on a 32 bit processor.
+  int16_t raw = (data[1] << 8) | data[0];
+  if (type_s) {
+    raw = raw << 3; // 9 bit resolution default
+    if (data[7] == 0x10) {
+      // "count remain" gives full 12 bit resolution
+      raw = (raw & 0xFFF0) + 12 - data[6];
+    }
+  } else {
+    byte cfg = (data[4] & 0x60);
+    // at lower res, the low bits are undefined, so let's zero them
+    if (cfg == 0x00) raw = raw & ~7;  // 9 bit resolution, 93.75 ms
+    else if (cfg == 0x20) raw = raw & ~3; // 10 bit res, 187.5 ms
+    else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
+    //// default is 12 bit resolution, 750 ms conversion time
+  }
+  celsius = (float)raw / 16.0;
+  fahrenheit = celsius * 1.8 + 32.0;
+  //lcd.print(celsius);
+  //lcd.print(" Celsius, ");
+  lcd.print(fahrenheit);
+  lcd.print(" f");
 }
 
-// reads the internal tempature of the CPU's internal thermomiter
-int get_internal_temp() {
-  analogReference(INTERNAL1V1);
-  int raw = analogRead(A0+15); 
-  int in_c = raw - 273; // celcius
-  analogReference(DEFAULT);
-  return in_c;
-}
-
-float c_to_f(int celsius)
-{
-  return 1.8 * celsius + 32;
-}
-
-// based on http://www.arduino.cc/en/Reference/Map but with doubles
-double doubleMap(double x, double in_min, double in_max, double out_min, double out_max)
-{
-  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+void setBacklight(uint8_t r, uint8_t g, uint8_t b) {
+  // normalize the red LED - its brighter than the rest!
+  r = map(r, 0, 255, 0, 100);
+  g = map(g, 0, 255, 0, 150);
+  r = map(r, 0, 255, 0, brightness);
+  g = map(g, 0, 255, 0, brightness);
+  b = map(b, 0, 255, 0, brightness);
+  // common anode so invert!
+  r = map(r, 0, 255, 255, 0);
+  g = map(g, 0, 255, 255, 0);
+  b = map(b, 0, 255, 255, 0);
+  analogWrite(REDLITE, r);
+  analogWrite(GREENLITE, g);
+  analogWrite(BLUELITE, b);
 }
