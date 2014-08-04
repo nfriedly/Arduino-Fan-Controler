@@ -11,12 +11,17 @@
 
 OneWire  ds(4);  // on pin 10 (a 4.7K resistor is necessary)
 
-byte addr0[] = {0x28, 0x1D, 0x57, 0x44, 0x6, 0x0, 0x0, 0xF4};
+byte addr0[] = {0x28, 0xE9, 0x5C, 0x43, 0x6, 0x0, 0x0, 0xAC};
 byte addr1[] = {0x28, 0x78, 0x35, 0x44, 0x6, 0x0, 0x0, 0x4E};
-byte addr2[] = {0x28, 0xE9, 0x5C, 0x43, 0x6, 0x0, 0x0, 0xAC}; 
+byte addr2[] = {0x28, 0x1D, 0x57, 0x44, 0x6, 0x0, 0x0, 0xF4};
 byte addr3[] = {0x28, 0xB9, 0x2B, 0x43, 0x6, 0x0, 0x0, 0xBE};
+
 #define NUMBER_OF_SENSORS 4
 byte* addrs[NUMBER_OF_SENSORS];
+
+float temperatures[NUMBER_OF_SENSORS];
+
+byte sensorIndex = 0;
 
 // lcd setup - https://learn.adafruit.com/character-lcds/rgb-backlit-lcds
 
@@ -37,6 +42,8 @@ void setup(void) {
   addrs[2] = addr2;
   addrs[3] = addr3;
 
+  lcd.print("KIT LIV BED OUT");
+
   pinMode(REDLITE, OUTPUT);
   pinMode(GREENLITE, OUTPUT);
   pinMode(BLUELITE, OUTPUT);
@@ -46,106 +53,116 @@ void setup(void) {
 }
 
 void loop(void) {
+  // fake cooperative threading - everything checks the clock rather than calling delay()
+  tickSensors();
+  tickDisplay();
+}
+
+void tickDisplay() {
+  const int waitLength = 200; // in ms. 200ms = 5 frames per second
+  static unsigned long previousMillis = 0;
+  unsigned long currentMillis = millis();
+  
+  if ( (currentMillis > previousMillis  && currentMillis - previousMillis > waitLength) // normal case
+          || (currentMillis < previousMillis && currentMillis > waitLength) // millis() rolled over to 0 recently, wait a little extra time. Happens ~ every 4 days.
+    ) { 
+    for(byte i = 0; i<NUMBER_OF_SENSORS; i++) {
+      // choose the column for this temp
+      byte col = i*4;
+      lcd.setCursor(col, 1);
+      lcd.print((int)temperatures[i]);
+      lcd.print(" "); // this is for when the temp drops from 100 to 99 - otherwise the screen would read 990
+    }
+  }  
+}
+
+void tickSensors() {
   byte i;
-  byte present = 0;
   byte type_s;
   byte data[12];
-  static byte sensorIndex = 0;
   byte* addr = addrs[sensorIndex];
   float celsius, fahrenheit;
-  
- 
-  sensorIndex++;
-  if (sensorIndex >= NUMBER_OF_SENSORS) {
-    sensorIndex = 0;
-  }
-  
-  
-  
-  lcd.clear();
-  for( i = 0; i < 8; i++) {
-    lcd.print(addr[i], HEX);
-  }
-  
-  lcd.setCursor(0,1);
-  
+  static byte waiting = false;
+  const int waitLength = 750; // in ms. 750 should be enough per documentation.
+  static unsigned long previousMillis = 0;
+  unsigned long currentMillis = millis();
   
   if (OneWire::crc8(addr, 7) != addr[7]) {
-      lcd.print(" CRC is not valid!     ");
-      delay(1000);
+      temperatures[sensorIndex] = -1;
+      sensorIndex++; // todo: figure out how to do this better
       return;
   } 
   
- 
-  // the first ROM byte indicates which chip
-  switch (addr[0]) {
-    case 0x10:
-      //lcd.print("  Chip = DS18S20");  // or old DS1820
-      type_s = 1;
-      break;
-    case 0x28:
-      //lcd.print("  Chip = DS18B20");
-      type_s = 0;
-      break;
-    case 0x22:
-      //lcd.print("  Chip = DS1822");
-      type_s = 0;
-      break;
-    default:
-      //lcd.print("Device is not a DS18x20 family device.");
-      return;
-  } 
-
-  ds.reset();
-  ds.select(addr);
-  ds.write(0x44, 1);        // start conversion, with parasite power on at the end
+  if(!waiting) {
+    // the first ROM byte indicates which chip
+    switch (addr[0]) {
+      case 0x10:
+        //lcd.print("  Chip = DS18S20");  // or old DS1820
+        type_s = 1;
+        break;
+      case 0x28:
+        //lcd.print("  Chip = DS18B20");
+        type_s = 0;
+        break;
+      case 0x22:
+        //lcd.print("  Chip = DS1822");
+        type_s = 0;
+        break;
+      default:
+        //lcd.print("Device is not a DS18x20 family device.");
+        return;
+    } 
   
-  delay(1000);     // maybe 750ms is enough, maybe not
-  // we might do a ds.depower() here, but the reset will take care of it.
-  
-  lcd.clear();
-  for( i = 0; i < 8; i++) {
-    lcd.print(addr[i], HEX);
-  }
-  
-  // next line
-  lcd.setCursor(0,1);
-  
-  present = ds.reset();
-  ds.select(addr);    
-  ds.write(0xBE);         // Read Scratchpad
-
-  for ( i = 0; i < 9; i++) {           // we need 9 bytes
-    data[i] = ds.read();
-  }
-
-  // Convert the data to actual temperature
-  // because the result is a 16 bit signed integer, it should
-  // be stored to an "int16_t" type, which is always 16 bits
-  // even when compiled on a 32 bit processor.
-  int16_t raw = (data[1] << 8) | data[0];
-  if (type_s) {
-    raw = raw << 3; // 9 bit resolution default
-    if (data[7] == 0x10) {
-      // "count remain" gives full 12 bit resolution
-      raw = (raw & 0xFFF0) + 12 - data[6];
-    }
+    ds.reset();
+    ds.select(addr);
+    ds.write(0x44, 1);        // start conversion, with parasite power on at the end
+    waiting = true;
+    previousMillis = currentMillis; 
   } else {
-    byte cfg = (data[4] & 0x60);
-    // at lower res, the low bits are undefined, so let's zero them
-    if (cfg == 0x00) raw = raw & ~7;  // 9 bit resolution, 93.75 ms
-    else if (cfg == 0x20) raw = raw & ~3; // 10 bit res, 187.5 ms
-    else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
-    //// default is 12 bit resolution, 750 ms conversion time
-  }
-  celsius = (float)raw / 16.0;
-  fahrenheit = celsius * 1.8 + 32.0;
-  //lcd.print(celsius);
-  //lcd.print(" Celsius, ");
-  lcd.print(fahrenheit);
-  lcd.print(" f");
+    // were waiting on the sensor. 
+    if ( (currentMillis > previousMillis  && currentMillis - previousMillis > waitLength) // normal case
+          || (currentMillis < previousMillis && currentMillis > waitLength) // millis() rolled over to 0 recently, wait a little extra time. Happens ~ every 4 days.
+    ) {
   
-  delay(1000);
+      waiting = false;
+      ds.reset();
+      ds.select(addr);    
+      ds.write(0xBE);         // Read Scratchpad
+    
+      for ( i = 0; i < 9; i++) {           // we need 9 bytes
+        data[i] = ds.read();
+      }
+    
+      // Convert the data to actual temperature
+      // because the result is a 16 bit signed integer, it should
+      // be stored to an "int16_t" type, which is always 16 bits
+      // even when compiled on a 32 bit processor.
+      int16_t raw = (data[1] << 8) | data[0];
+      if (type_s) {
+        raw = raw << 3; // 9 bit resolution default
+        if (data[7] == 0x10) {
+          // "count remain" gives full 12 bit resolution
+          raw = (raw & 0xFFF0) + 12 - data[6];
+        }
+      } else {
+        byte cfg = (data[4] & 0x60);
+        // at lower res, the low bits are undefined, so let's zero them
+        if (cfg == 0x00) raw = raw & ~7;  // 9 bit resolution, 93.75 ms
+        else if (cfg == 0x20) raw = raw & ~3; // 10 bit res, 187.5 ms
+        else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
+        //// default is 12 bit resolution, 750 ms conversion time
+      }
+      celsius = (float)raw / 16.0;
+      fahrenheit = celsius * 1.8 + 32.0;
+      
+      temperatures[sensorIndex] = fahrenheit;
+      
+      sensorIndex++;
+      if (sensorIndex >= NUMBER_OF_SENSORS) {
+        sensorIndex = 0;
+      }
+    }
+  }
 }
 
 void setBacklight(uint8_t r, uint8_t g, uint8_t b) {
