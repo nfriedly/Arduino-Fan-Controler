@@ -11,11 +11,12 @@
 
 OneWire  ds(4);  // on pin 10 (a 4.7K resistor is necessary)
 
+byte addr0[] = {0x28, 0x1D, 0x57, 0x44, 0x6, 0x0, 0x0, 0xF4};
 byte addr1[] = {0x28, 0x78, 0x35, 0x44, 0x6, 0x0, 0x0, 0x4E};
 byte addr2[] = {0x28, 0xE9, 0x5C, 0x43, 0x6, 0x0, 0x0, 0xAC}; 
 byte addr3[] = {0x28, 0xB9, 0x2B, 0x43, 0x6, 0x0, 0x0, 0xBE};
-byte addr4[] = {0x28, 0x1D, 0x57, 0x44, 0x6, 0x0, 0x0, 0xF4};
-
+#define NUMBER_OF_SENSORS 4
+byte* addrs[NUMBER_OF_SENSORS];
 
 // lcd setup - https://learn.adafruit.com/character-lcds/rgb-backlit-lcds
 
@@ -30,11 +31,17 @@ int brightness = 255;
 void setup(void) {
    // set up the LCD's number of rows and columns:
   lcd.begin(16, 2);
+  
+  addrs[0] = addr0;
+  addrs[1] = addr1;
+  addrs[2] = addr2;
+  addrs[3] = addr3;
 
   pinMode(REDLITE, OUTPUT);
   pinMode(GREENLITE, OUTPUT);
   pinMode(BLUELITE, OUTPUT);
    
+  setBacklight(0, 0, 255);
   //brightness = 100;
 }
 
@@ -43,42 +50,32 @@ void loop(void) {
   byte present = 0;
   byte type_s;
   byte data[12];
-  byte addr[8];
+  static byte sensorIndex = 0;
+  byte* addr = addrs[sensorIndex];
   float celsius, fahrenheit;
   
- for (int i = 0; i < 255; i++) {
-  setBacklight(i, 0, 255-i);
-  delay(5);
+ 
+  sensorIndex++;
+  if (sensorIndex >= NUMBER_OF_SENSORS) {
+    sensorIndex = 0;
   }
-  for (int i = 0; i < 255; i++) {
-  setBacklight(255-i, i, 0);
-  delay(5);
-  }
-  for (int i = 0; i < 255; i++) {
-  setBacklight(0, 255-i, i);
-  delay(5);
-  }
+  
+  
   
   lcd.clear();
-  
-  if ( !ds.search(addr)) {
-    lcd.print("No more addresses.");
-    ds.reset_search();
-    delay(250);
-    return;
-  }
-  
   for( i = 0; i < 8; i++) {
     lcd.print(addr[i], HEX);
   }
   
-  // next line
   lcd.setCursor(0,1);
-
+  
+  
   if (OneWire::crc8(addr, 7) != addr[7]) {
-      lcd.print("CRC is not valid!");
+      lcd.print(" CRC is not valid!     ");
+      delay(1000);
       return;
-  }
+  } 
+  
  
   // the first ROM byte indicates which chip
   switch (addr[0]) {
@@ -105,6 +102,14 @@ void loop(void) {
   
   delay(1000);     // maybe 750ms is enough, maybe not
   // we might do a ds.depower() here, but the reset will take care of it.
+  
+  lcd.clear();
+  for( i = 0; i < 8; i++) {
+    lcd.print(addr[i], HEX);
+  }
+  
+  // next line
+  lcd.setCursor(0,1);
   
   present = ds.reset();
   ds.select(addr);    
@@ -139,6 +144,8 @@ void loop(void) {
   //lcd.print(" Celsius, ");
   lcd.print(fahrenheit);
   lcd.print(" f");
+  
+  delay(1000);
 }
 
 void setBacklight(uint8_t r, uint8_t g, uint8_t b) {
