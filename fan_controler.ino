@@ -48,8 +48,7 @@ void setup(void) {
   pinMode(GREENLITE, OUTPUT);
   pinMode(BLUELITE, OUTPUT);
    
-  setBacklight(0, 0, 255);
-  //brightness = 100;
+  setBacklight(255, 255, 255);
 }
 
 void loop(void) {
@@ -62,6 +61,7 @@ void tickDisplay() {
   const int waitLength = 200; // in ms. 200ms = 5 frames per second
   static unsigned long previousMillis = 0;
   unsigned long currentMillis = millis();
+  int otherColors;
   
   if ( (currentMillis > previousMillis  && currentMillis - previousMillis > waitLength) // normal case
           || (currentMillis < previousMillis && currentMillis > waitLength) // millis() rolled over to 0 recently, wait a little extra time. Happens ~ every 4 days.
@@ -72,6 +72,16 @@ void tickDisplay() {
       lcd.setCursor(col, 1);
       lcd.print((int)temperatures[i]);
       lcd.print(" "); // this is for when the temp drops from 100 to 99 - otherwise the screen would read 990
+    }
+
+    float diff = getInsideTemp() - getOutsideTemp();
+    if (diff > 0) {
+       // it's hotter inside - show red
+       otherColors = map(diff, 0, 3, 255, 0);
+       setBacklight(255, otherColors, otherColors);
+    } else {
+      otherColors = map(diff, 0, -3, 255, 0);
+      setBacklight(otherColors, otherColors, 255);
     }
   }  
 }
@@ -165,10 +175,20 @@ void tickSensors() {
   }
 }
 
+// todo: make these adjustable to arbitrary numbers of sensors
+// assumes the first three sensors are inside
+float getInsideTemp() {
+  return (temperatures[0] + temperatures[1] + temperatures[2])/3.0;
+}
+// assumes the last sensor is outside
+float getOutsideTemp() {
+  return temperatures[3];
+}
+
 void setBacklight(uint8_t r, uint8_t g, uint8_t b) {
   // normalize the red LED - its brighter than the rest!
-  r = map(r, 0, 255, 0, 100);
-  g = map(g, 0, 255, 0, 150);
+  //r = map(r, 0, 255, 0, 100);
+  //g = map(g, 0, 255, 0, 150);
   r = map(r, 0, 255, 0, brightness);
   g = map(g, 0, 255, 0, brightness);
   b = map(b, 0, 255, 0, brightness);
