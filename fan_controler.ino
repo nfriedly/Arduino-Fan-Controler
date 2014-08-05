@@ -62,6 +62,7 @@ void tickDisplay() {
   static unsigned long previousMillis = 0;
   unsigned long currentMillis = millis();
   int otherColors;
+  int maxTemperatureDiff = 4; // how many degrees outside needs to be from the inside before the screen color is 100% red or blue
   
   if ( (currentMillis > previousMillis  && currentMillis - previousMillis > waitLength) // normal case
           || (currentMillis < previousMillis && currentMillis > waitLength) // millis() rolled over to 0 recently, wait a little extra time. Happens ~ every 4 days.
@@ -77,10 +78,10 @@ void tickDisplay() {
     float diff = getInsideTemp() - getOutsideTemp();
     if (diff > 0) {
        // it's hotter inside - show red
-       otherColors = map(diff, 0, 3, 255, 0);
+       otherColors = map(diff, 0, maxTemperatureDiff, 255, 0);
        setBacklight(255, otherColors, otherColors);
     } else {
-      otherColors = map(diff, 0, -3, 255, 0);
+      otherColors = map(diff, 0, -maxTemperatureDiff, 255, 0);
       setBacklight(otherColors, otherColors, 255);
     }
   }  
@@ -187,8 +188,8 @@ float getOutsideTemp() {
 
 void setBacklight(uint8_t r, uint8_t g, uint8_t b) {
   // normalize the red LED - its brighter than the rest!
-  //r = map(r, 0, 255, 0, 100);
-  //g = map(g, 0, 255, 0, 150);
+  r = map(r, 0, 255, 0, 100);
+  g = map(g, 0, 255, 0, 150);
   r = map(r, 0, 255, 0, brightness);
   g = map(g, 0, 255, 0, brightness);
   b = map(b, 0, 255, 0, brightness);
