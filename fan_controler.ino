@@ -117,7 +117,7 @@ void tickDisplay() {
   static unsigned long previousMillis = 0;
   unsigned long currentMillis = millis();
   int otherColors;
-  int maxTemperatureDiff = 4; // how many degrees outside needs to be from the inside before the screen color is 100% red or blue
+  int maxTemperatureDiff = 8; // how many degrees outside needs to be from the inside before the screen color is 100% red or blue
 
   if ( (currentMillis > previousMillis  && currentMillis - previousMillis > waitLength) // normal case
   || (currentMillis < previousMillis && currentMillis > waitLength) // millis() rolled over to 0 recently, wait a little extra time. Happens ~ every 4 days.
