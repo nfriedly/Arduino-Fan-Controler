@@ -30,10 +30,10 @@ byte sensorIndex = 0;
 // lcd setup - https://learn.adafruit.com/character-lcds/rgb-backlit-lcds
 
 #define REDLITE 3
-#define GREENLITE 5
-#define BLUELITE 6
+#define GREENLITE 10
+#define BLUELITE 9
 // initialize the library with the numbers of the interface pins
-LiquidCrystal lcd(7, 8, 9, 10, 11, 12);
+LiquidCrystal lcd(7, 8, 6, 5, 11, 12);
 // you can change the overall brightness by range 0 -> 255
 int brightness = 255;
 
@@ -274,8 +274,8 @@ float getOutsideTemp() {
 
 void setBacklight(uint8_t r, uint8_t g, uint8_t b) {
   // normalize the red LED - its brighter than the rest!
-  r = map(r, 0, 255, 0, 100);
-  g = map(g, 0, 255, 0, 150);
+  //r = map(r, 0, 255, 0, 100);
+  //g = map(g, 0, 255, 0, 150);
   r = map(r, 0, 255, 0, brightness);
   g = map(g, 0, 255, 0, brightness);
   b = map(b, 0, 255, 0, brightness);
