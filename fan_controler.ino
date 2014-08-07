@@ -44,6 +44,7 @@ void readDial() {
   static byte lastDial = 0;
   int rawDial = analogRead(3);
   // todo: consider allowing for a small amount of jitter in the raw values (beyond what map adds) without counting it as a change
+  // maybe something from http://playground.arduino.cc/Main/RunningAverage
   dial = map(rawDial, 0, 1023, 40, 81); // <60 is special, 60-80 is temperature target
   if (dial != lastDial) { 
     lastDial = dial;
