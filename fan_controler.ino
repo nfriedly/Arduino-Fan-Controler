@@ -76,6 +76,10 @@ int getMode() {
   return FAN_AUTO;
 }
 
+
+const int FAN_CONTROL_PIN = A2; // ran out of digital pins between the screen and sensors (mainly the screen). Fortuinately the analog in pins can double as digital pins.
+  
+
 void setup(void) {
   // set up the LCD's number of rows and columns:
   lcd.begin(16, 2);
@@ -92,6 +96,8 @@ void setup(void) {
   setBacklight(255, 255, 255);
 
   lastDialChangeTime = millis();
+  
+  pinMode(FAN_CONTROL_PIN, OUTPUT);
 }
 
 void loop(void) {
@@ -99,6 +105,7 @@ void loop(void) {
   updateBrightness();
   tickSensors();
   tickDisplay();
+  tickFanControl();
 }
 
 void updateBrightness() {
@@ -119,6 +126,7 @@ void tickDisplay() {
   int otherColors;
   int maxTemperatureDiff = 8; // how many degrees outside needs to be from the inside before the screen color is 100% red or blue
 
+  // todo: extract this no-delay delay to a function
   if ( (currentMillis > previousMillis  && currentMillis - previousMillis > waitLength) // normal case
   || (currentMillis < previousMillis && currentMillis > waitLength) // millis() rolled over to 0 recently, wait a little extra time. Happens ~ every 4 days.
   ) { 
@@ -259,6 +267,40 @@ void tickSensors() {
         sensorIndex = 0;
       }
     }
+  }
+}
+
+void tickFanControl() {
+  byte mode = getMode();
+  switch (mode) {
+    case FAN_OFF:
+    case FAN_STANDBY:
+      digitalWrite(FAN_CONTROL_PIN, LOW);
+      break;
+    case FAN_ON:
+      digitalWrite(FAN_CONTROL_PIN, HIGH);
+      break;
+    case FAN_AUTO:
+      static byte previousDial = dial;
+      static const int waitLength = 2 * 60 * 1000; // in ms. 2*60*1000 = 2 minutes
+      static unsigned long previousMillis = 0;
+      unsigned long currentMillis = millis();
+      if ( (currentMillis > previousMillis  && currentMillis - previousMillis > waitLength) // normal case
+      || (currentMillis < previousMillis && currentMillis > waitLength) // millis() rolled over to 0 recently, wait a little extra time. Happens ~ every 4 days.
+      || previousDial != dial // trigger immediately when the dial changes
+      ) { 
+        previousMillis = currentMillis;
+        previousDial = dial;
+        int in = getInsideTemp();
+        int out = getOutsideTemp();
+        // if it's warmer inside than out AND outside is cooler than the target temp, turn the fan on
+        if (in > out && out < dial) {
+          digitalWrite(FAN_CONTROL_PIN, HIGH);
+        } else {
+          digitalWrite(FAN_CONTROL_PIN, LOW);
+        }
+      }
+      break;
   }
 }
 
